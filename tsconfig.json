@@ -5,6 +5,14 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    // Extra strictness beyond `strict: true` ───────────────────────────────
+    // arr[0] returns T | undefined, not T — critical for DB query result safety
+    "noUncheckedIndexedAccess": true,
+    // Every code path in a function must explicitly return a value
+    "noImplicitReturns": true,
+    // { a?: string } is treated differently from { a: string | undefined }
+    "exactOptionalPropertyTypes": true,
+    // ────────────────────────────────────────────────────────────────────────
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
