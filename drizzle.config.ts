@@ -8,9 +8,9 @@ export default defineConfig({
   schema: "./database/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    // Use the DIRECT connection (port 5432) for migrations — NOT the pooler.
+    // Use the DIRECT connection (port 5432) for migrations and Studio.
     // The Transaction pooler (port 6543) does not support DDL statements.
-    url: process.env.DATABASE_URL!,
+    url: process.env.DATABASE_DIRECT_URL ?? process.env.DATABASE_URL!,
   },
   // Print every SQL statement that will be executed
   verbose: true,
