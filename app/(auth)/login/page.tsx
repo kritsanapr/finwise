@@ -68,21 +68,35 @@ export default function LoginPage() {
         router.push("/dashboard");
         router.refresh();
       } else {
-        const { error } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: { display_name: data.displayName },
-          },
+        // Use admin API route to create user with email pre-confirmed
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+            displayName: data.displayName,
+          }),
         });
-        if (error) {
+        const json = await res.json();
+        if (!res.ok) {
           triggerShake();
-          toast.error(error.message);
+          toast.error(json.error ?? "Sign up failed");
           return;
         }
-        toast.success("Account created! Check your email to verify.");
-        setMode("login");
-        reset();
+        // Sign in immediately after account creation
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        if (signInError) {
+          triggerShake();
+          toast.error(signInError.message);
+          return;
+        }
+        toast.success("Account created! Welcome!");
+        router.push("/dashboard");
+        router.refresh();
       }
     } finally {
       setIsLoading(false);
