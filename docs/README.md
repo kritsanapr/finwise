@@ -14,10 +14,11 @@ This directory is the project-facing documentation hub for Finwise.
 ## Recommended Reading Order
 
 1. `project/overview.md`
-2. `project/setup.md`
-3. `migrations/README.md`
-4. `../database/SCHEMA.md`
-5. `../database/DB_DESIGN.md`
+2. `project/timeline.md`
+3. `project/setup.md`
+4. `migrations/README.md`
+5. `../database/SCHEMA.md`
+6. `../database/DB_DESIGN.md`
 
 ## Current Source Of Truth
 

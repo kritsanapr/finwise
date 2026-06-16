@@ -69,14 +69,83 @@ Examples in the current codebase:
 
 ### Primary Pattern
 
-The repo currently uses **Elysia inside Next Route Handlers** as the main API layer.
+The repo currently uses **Elysia inside Next Route Handlers** as the main API layer. The Elysia app is composed from focused sub-app modules with shared auth and error plugins.
 
 Keep these principles:
 
 - Extend `app/api/[[...slugs]]/route.ts` for most app API additions
-- Keep auth enforcement inside handlers
-- Return predictable JSON payloads
-- Co-locate request validation with handler logic or shared Zod schemas
+- Add new features as a new module under `app/api/[[...slugs]]/modules/` and `.use(...)` it from `route.ts`
+- Put reusable TypeBox request schemas under `lib/server/validation/`
+- Put reusable Drizzle + business logic under `lib/server/services/`
+- Return predictable JSON payloads — error responses use the `{ error, issues? }` shape produced by the error plugin
+- Validate request inputs with TypeBox (Elysia) at the HTTP boundary, and with Zod (`lib/validations/`) at the form boundary
+
+### Elysia Module Layout
+
+```
+app/api/[[...slugs]]/
+├── route.ts                          # thin assembler, mounts plugins + modules
+├── plugins/
+│   ├── auth.ts                       # authPlugin: resolve { authUser, dbUser }
+│   └── error.ts                      # errorHandler: standardized JSON errors
+└── modules/
+    ├── health.ts                     # GET /health
+    ├── expenses.ts                   # GET/POST/PUT/DELETE /expenses
+    ├── dashboard.ts                  # GET /dashboard/stats
+    ├── receipts.ts                   # POST /receipts/upload
+    └── slips.ts                      # POST /slips/upload
+
+lib/server/
+├── auth/current-user.ts              # getAuthUser, getOrCreateDbUser, requireUser, ApiAuthError
+├── services/                         # plain async Drizzle functions, ownership-aware
+│   ├── expenses.ts                   # listExpenses, createExpense, updateExpense, deleteExpense
+│   ├── dashboard.ts                  # getDashboardStats
+│   ├── receipts.ts                   # uploadReceipt
+│   └── slips.ts                      # uploadBankSlip
+└── validation/schemas.ts             # TypeBox schemas (Elysia HTTP boundary)
+
+lib/validations/
+├── expense.ts                        # Zod schemas for the React form (expenseSchema, EXPENSE_CATEGORIES)
+└── api.ts                            # Zod schemas mirroring the TypeBox API shapes
+```
+
+When adding a new endpoint:
+
+1. Add or extend a service function in `lib/server/services/`.
+2. Add or extend the TypeBox schema in `lib/server/validation/schemas.ts` (and the Zod mirror in `lib/validations/api.ts` if it is a new shape).
+3. Add the route to the appropriate module under `app/api/[[...slugs]]/modules/` and call the service.
+4. Do not change `route.ts` unless you are wiring up a brand new module.
+
+### Auth Plugin
+
+`plugins/auth.ts` exposes `authPlugin = new Elysia({ name: "auth" }).resolve({ as: "scoped" }, ...)`. Any module that does `.use(authPlugin)` gets `{ authUser, dbUser }` on the request context. The plugin is scoped (`as: "scoped"`) so the typed context flows into the module's routes. Unauthenticated requests throw `ApiAuthError` (defined in `lib/server/auth/current-user.ts`), which the error plugin translates into HTTP 401.
+
+### Error Plugin
+
+`plugins/error.ts` mounts `.onError` at the root. It normalizes:
+
+- `ApiAuthError` -> 401 `{ error }`
+- Elysia `VALIDATION` -> 400 `{ error, issues }`
+- Elysia `NOT_FOUND` -> 404 `{ error }`
+- Elysia `PARSE` -> 400 `{ error }`
+- everything else -> 500 `{ error: "Internal Server Error" }`
+
+Handlers should prefer throwing `status(code, message)` or returning early, rather than manually writing `set.status = ...` and returning `{ error }`.
+
+### Public API Surface
+
+| Method | Path | Auth | Source |
+| --- | --- | --- | --- |
+| GET | `/api/health` | public | `modules/health.ts` |
+| GET | `/api/expenses` | required | `modules/expenses.ts` |
+| POST | `/api/expenses` | required | `modules/expenses.ts` |
+| PUT | `/api/expenses/:id` | required | `modules/expenses.ts` |
+| DELETE | `/api/expenses/:id` | required | `modules/expenses.ts` |
+| GET | `/api/dashboard/stats` | required | `modules/dashboard.ts` |
+| POST | `/api/receipts/upload` | required | `modules/receipts.ts` |
+| POST | `/api/slips/upload` | required | `modules/slips.ts` |
+
+`app/api/auth/signup/route.ts` is intentionally a standalone Next Route Handler (admin signup uses the service role key, not the user session) and is **not** mounted through Elysia. See the next section.
 
 ### Secondary Pattern
 
@@ -84,11 +153,11 @@ Use standalone `app/api/**/route.ts` files only when:
 
 - The endpoint is intentionally isolated
 - Elysia integration is a poor fit
-- The endpoint has framework-specific needs
+- The endpoint has framework-specific needs (for example, it needs the Next.js `NextRequest`/`NextResponse` shape)
 
 Current example:
 
-- `app/api/auth/signup/route.ts`
+- `app/api/auth/signup/route.ts` (admin signup via the Supabase service role)
 
 ## Data And Persistence Layers
 
