@@ -1,5 +1,8 @@
 # Database Schema — FinWise
 
+> หากต้องการดู **แบบฐานข้อมูลที่แนะนำสำหรับ MVP และการ scale ต่อในอนาคต**
+> ให้ดูเพิ่มที่ `database/DB_DESIGN.md`
+
 > **Stack:** PostgreSQL (Supabase) · Drizzle ORM · Supabase File Storage  
 > **File:** `database/schema.ts`
 
